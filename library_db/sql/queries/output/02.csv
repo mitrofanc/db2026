@@ -1,0 +1,2 @@
+reader_name,total_ticket_count,has_active_ticket,current_ticket_number,current_ticket_expire_date,total_request_count,violation_request_count,current_overdue_book_count
+Петров Кирилл Алексеевна,1,true,TKT0000015,2030-05-18,1,1,1
