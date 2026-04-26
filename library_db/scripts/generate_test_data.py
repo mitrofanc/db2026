@@ -20,7 +20,9 @@ EDITIONS_COUNT = int(os.getenv("EDITIONS_COUNT", "90"))
 REQUESTS_COUNT = int(os.getenv("REQUESTS_COUNT", "120"))
 
 random.seed(RANDOM_SEED)
-TODAY = date.today()
+DATA_YEAR = 2024
+YEAR_START = date(DATA_YEAR, 1, 1)
+TODAY = date(DATA_YEAR, 12, 31)
 
 LAST_NAMES = [
     "Иванов", "Петров", "Сидоров", "Смирнов", "Кузнецов", "Попов", "Соколов", "Лебедев",
@@ -75,6 +77,11 @@ def password_hash(value):
 def numeric_passport(series_code, idx):
     return f"{series_code:04d}{idx + 1:06d}"
 
+
+def random_date_between(start_date=YEAR_START, end_date=TODAY):
+    return start_date + timedelta(days=random.randint(0, (end_date - start_date).days))
+
+
 def fetch_ids(cur, query, params=None):
     cur.execute(query, params or ())
     return [row[0] for row in cur.fetchall()]
@@ -116,10 +123,10 @@ def has_overdue(cur, ticket_id):
             JOIN issue_item i ON i.issue_doc_id = d.issue_doc_id
             WHERE d.ticket_id = %s
               AND i.return_date IS NULL
-              AND i.due_date < CURRENT_DATE
+              AND i.due_date < %s
         )
         """,
-        (ticket_id,),
+        (ticket_id, TODAY),
     )
     return cur.fetchone()[0]
 
@@ -280,12 +287,12 @@ for i in range(READERS_COUNT):
     reader_id = cur.fetchone()[0]
     reader_ids.append(reader_id)
 
-    issue_date = TODAY - timedelta(days=random.randint(30, 365 * 4))
+    issue_date = random_date_between()
     expire_date = issue_date + timedelta(days=365 * 5)
 
     # часть билетов делаем просроченными
-    if random.random() < 0.12:
-        expire_date = TODAY - timedelta(days=random.randint(1, 40))
+    if random.random() < 0.12 and issue_date < TODAY:
+        expire_date = random_date_between(issue_date, TODAY - timedelta(days=1))
         is_active = False
     else:
         is_active = True
@@ -309,6 +316,28 @@ for i in range(READERS_COUNT):
         ),
     )
     ticket_ids.append(cur.fetchone()[0])
+
+    # часть читателей получает архивный билет, чтобы запрос 04 находил пользователей с перевыпуском
+    if i < max(1, READERS_COUNT // 5):
+        archived_issue_date = random_date_between(YEAR_START, TODAY - timedelta(days=1))
+        archived_expire_date = random_date_between(archived_issue_date, TODAY - timedelta(days=1))
+        cur.execute(
+            """
+            INSERT INTO ticket (
+                ticket_number, owner_user_id, operator_user_id,
+                issue_date, expire_date, is_active
+            )
+            VALUES (%s,%s,%s,%s,%s,%s)
+            """,
+            (
+                f"TKT{READERS_COUNT + i:07d}",
+                reader_id,
+                random.choice(operator_ids),
+                archived_issue_date,
+                archived_expire_date,
+                False,
+            ),
+        )
 
 # издательства
 publisher_ids = []
@@ -398,7 +427,7 @@ for i in range(EDITIONS_COUNT):
 for _ in range(max(10, READERS_COUNT // 3)):
     ticket_id = random.choice(ticket_ids)
     operator_id = random.choice(operator_ids)
-    issue_date = TODAY - timedelta(days=random.randint(20, 120))
+    issue_date = random_date_between()
 
     cur.execute(
         """
@@ -431,7 +460,7 @@ for _ in range(max(10, READERS_COUNT // 3)):
             )
         # просрочена и не возвращена
         elif scenario < 0.55:
-            overdue_issue_date = TODAY - timedelta(days=random.randint(35, 120))
+            overdue_issue_date = random_date_between(YEAR_START, TODAY - timedelta(days=31))
             overdue_due_date = overdue_issue_date + timedelta(days=30)
             cur.execute("UPDATE issue_doc SET issue_date = %s WHERE issue_doc_id = %s",
                         (overdue_issue_date, issue_doc_id))
@@ -445,7 +474,7 @@ for _ in range(max(10, READERS_COUNT // 3)):
             decrement_current_count(cur, edition_id)
         # активна, не просрочена
         elif scenario < 0.80:
-            active_issue_date = TODAY - timedelta(days=random.randint(1, 20))
+            active_issue_date = random_date_between(TODAY - timedelta(days=29), TODAY)
             active_due_date = active_issue_date + timedelta(days=30)
             cur.execute("UPDATE issue_doc SET issue_date = %s WHERE issue_doc_id = %s",
                         (active_issue_date, issue_doc_id))
@@ -459,8 +488,11 @@ for _ in range(max(10, READERS_COUNT // 3)):
             decrement_current_count(cur, edition_id)
         # продлённая выдача
         else:
-            renew_issue_date = TODAY - timedelta(days=random.randint(25, 70))
             renew_count = random.randint(1, 3)
+            renew_issue_date = random_date_between(
+                YEAR_START,
+                TODAY - timedelta(days=30 * (renew_count + 1)),
+            )
             due_date = renew_issue_date + timedelta(days=30 * (renew_count + 1))
             last_renew_date = due_date - timedelta(days=30)
             cur.execute("UPDATE issue_doc SET issue_date = %s WHERE issue_doc_id = %s",
@@ -489,7 +521,7 @@ reason_overdue = get_reason_id(cur, "RULES_VIOLATION")
 for i in range(REQUESTS_COUNT):
     ticket_id = random.choice(ticket_ids)
     operator_id = random.choice(operator_ids)
-    request_date = TODAY - timedelta(days=random.randint(0, 14))
+    request_date = random_date_between()
 
     cur.execute(
         """
