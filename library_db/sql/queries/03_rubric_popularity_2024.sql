@@ -7,8 +7,8 @@ WITH month_list AS (
                'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
            ])[EXTRACT(MONTH FROM gs)::INT] AS month_name
     FROM generate_series(
-        DATE '2024-01-01',
-        DATE '2024-12-01',
+        DATE '2026-01-01',
+        DATE '2026-12-01',
         INTERVAL '1 month'
     ) AS gs
 ),
@@ -25,8 +25,8 @@ request_facts AS (
     JOIN request_item ri ON ri.request_id = br.request_id
     JOIN edition e ON e.edition_id = ri.edition_id
     JOIN rubric r ON r.rubric_id = e.rubric_id
-    WHERE br.request_date >= DATE '2024-01-01'
-      AND br.request_date < DATE '2025-01-01'
+    WHERE br.request_date >= DATE '2026-01-01'
+      AND br.request_date < DATE '2027-01-01'
     GROUP BY DATE_TRUNC('month', br.request_date)::date,
              e.rubric_id,
              r.rubric_name,
@@ -45,7 +45,7 @@ rubric_month_stats AS (
 -- запросы по рубрике за год
 rubric_year_stats AS (
     SELECT rf.rubric_id,
-           SUM(rf.request_qty) AS rubric_request_count_in_2024
+           SUM(rf.request_qty) AS rubric_request_count_in_2026
     FROM request_facts rf
     GROUP BY rf.rubric_id
 ),
@@ -101,7 +101,7 @@ SELECT ml.month_name,
        tr.rubric_name AS most_popular_rubric,
        tb.title AS most_popular_book_in_rubric,
        COALESCE(tr.rubric_request_count_in_month, 0) AS rubric_request_count_in_month,
-       COALESCE(rys.rubric_request_count_in_2024, 0) AS rubric_request_count_in_2024,
+       COALESCE(rys.rubric_request_count_in_2026, 0) AS rubric_request_count_in_2026,
        COALESCE(tb.book_request_count_in_month, 0) AS book_request_count_in_month,
        tb.last_request_date_in_month
 FROM month_list ml

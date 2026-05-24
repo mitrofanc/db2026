@@ -1,0 +1,144 @@
+Sort  (cost=8390.06..8390.07 rows=2 width=127) (actual time=83.163..83.172 rows=1.00 loops=1)
+"  Sort Key: rr.current_overdue_book_count DESC, rr.reader_name"
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=1908
+  CTE reader_report
+    ->  Hash Left Join  (cost=8189.57..8330.29 rows=1258 width=88) (actual time=78.751..81.368 rows=5000.00 loops=1)
+          Hash Cond: (u.user_id = ranked.reader_id)
+          Buffers: shared hit=1908
+          ->  Hash Right Join  (cost=7746.99..7878.24 rows=1258 width=94) (actual time=75.961..77.131 rows=5000.00 loops=1)
+                Hash Cond: (t.owner_user_id = u.user_id)
+                Buffers: shared hit=1810
+                ->  HashAggregate  (cost=1089.25..1139.25 rows=5000 width=24) (actual time=6.923..7.263 rows=5000.00 loops=1)
+                      Group Key: t.owner_user_id
+                      Batches: 1  Memory Usage: 665kB
+                      Buffers: shared hit=290
+                      ->  Hash Right Join  (cost=554.90..970.52 rows=9498 width=20) (actual time=1.934..4.829 rows=13075.00 loops=1)
+                            Hash Cond: (id.ticket_id = t.ticket_id)
+                            Buffers: shared hit=290
+                            ->  Hash Join  (cost=243.20..636.66 rows=8438 width=12) (actual time=0.828..2.547 rows=8191.00 loops=1)
+                                  Hash Cond: (ii.issue_doc_id = id.issue_doc_id)
+                                  Buffers: shared hit=192
+                                  ->  Seq Scan on issue_item ii  (cost=0.00..371.30 rows=8438 width=12) (actual time=0.006..0.919 rows=8191.00 loops=1)
+                                        Filter: ((return_date IS NULL) AND (due_date < CURRENT_DATE))
+                                        Rows Removed by Filter: 8829
+                                        Buffers: shared hit=116
+                                  ->  Hash  (cost=150.31..150.31 rows=7431 width=16) (actual time=0.811..0.811 rows=7431.00 loops=1)
+                                        Buckets: 8192  Batches: 1  Memory Usage: 413kB
+                                        Buffers: shared hit=76
+                                        ->  Seq Scan on issue_doc id  (cost=0.00..150.31 rows=7431 width=16) (actual time=0.004..0.377 rows=7431.00 loops=1)
+                                              Buffers: shared hit=76
+                            ->  Hash  (cost=192.98..192.98 rows=9498 width=16) (actual time=1.089..1.089 rows=9498.00 loops=1)
+                                  Buckets: 16384  Batches: 1  Memory Usage: 574kB
+                                  Buffers: shared hit=98
+                                  ->  Seq Scan on ticket t  (cost=0.00..192.98 rows=9498 width=16) (actual time=0.014..0.615 rows=9498.00 loops=1)
+                                        Buffers: shared hit=98
+                ->  Hash  (cost=6642.02..6642.02 rows=1258 width=78) (actual time=69.029..69.035 rows=5000.00 loops=1)
+                      Buckets: 8192 (originally 2048)  Batches: 1 (originally 1)  Memory Usage: 658kB
+                      Buffers: shared hit=1520
+                      ->  Hash Right Join  (cost=6510.77..6642.02 rows=1258 width=78) (actual time=67.000..68.379 rows=5000.00 loops=1)
+                            Hash Cond: (t_1.owner_user_id = u.user_id)
+                            Buffers: shared hit=1520
+                            ->  HashAggregate  (cost=5808.76..5858.76 rows=5000 width=24) (actual time=60.477..60.880 rows=5000.00 loops=1)
+                                  Group Key: t_1.owner_user_id
+                                  Batches: 1  Memory Usage: 665kB
+                                  Buffers: shared hit=1272
+                                  ->  Hash Left Join  (cost=4529.46..5546.26 rows=35000 width=17) (actual time=43.833..55.712 rows=39505.00 loops=1)
+                                        Hash Cond: (br.request_id = rf.request_id)
+                                        Buffers: shared hit=1272
+                                        ->  Hash Right Join  (cost=311.71..1236.62 rows=35000 width=16) (actual time=1.291..7.224 rows=39505.00 loops=1)
+                                              Hash Cond: (br.ticket_id = t_1.ticket_id)
+                                              Buffers: shared hit=581
+                                              ->  Seq Scan on book_request br  (cost=0.00..833.00 rows=35000 width=16) (actual time=0.005..1.127 rows=35000.00 loops=1)
+                                                    Buffers: shared hit=483
+                                              ->  Hash  (cost=192.98..192.98 rows=9498 width=16) (actual time=1.257..1.257 rows=9498.00 loops=1)
+                                                    Buckets: 16384  Batches: 1  Memory Usage: 574kB
+                                                    Buffers: shared hit=98
+                                                    ->  Seq Scan on ticket t_1  (cost=0.00..192.98 rows=9498 width=16) (actual time=0.010..0.665 rows=9498.00 loops=1)
+                                                          Buffers: shared hit=98
+                                        ->  Hash  (cost=3844.33..3844.33 rows=29874 width=9) (actual time=42.515..42.517 rows=29874.00 loops=1)
+                                              Buckets: 32768  Batches: 1  Memory Usage: 1657kB
+                                              Buffers: shared hit=691
+                                              ->  Subquery Scan on rf  (cost=3246.85..3844.33 rows=29874 width=9) (actual time=37.124..40.363 rows=29874.00 loops=1)
+                                                    Buffers: shared hit=691
+                                                    ->  HashAggregate  (cost=3246.85..3545.59 rows=29874 width=9) (actual time=37.124..38.954 rows=29874.00 loops=1)
+                                                          Group Key: rd.request_id
+                                                          Batches: 1  Memory Usage: 2329kB
+                                                          Buffers: shared hit=691
+                                                          ->  Hash Left Join  (cost=893.25..2693.54 rows=73775 width=21) (actual time=3.853..25.439 rows=73775.00 loops=1)
+                                                                Hash Cond: (ri.reason_id = rr_1.reason_id)
+                                                                Buffers: shared hit=691
+                                                                ->  Hash Join  (cost=892.17..2293.60 rows=73775 width=16) (actual time=3.372..16.624 rows=73775.00 loops=1)
+                                                                      Hash Cond: (ri.refusal_doc_id = rd.refusal_doc_id)
+                                                                      Buffers: shared hit=690
+                                                                      ->  Seq Scan on refusal_item ri  (cost=0.00..1207.75 rows=73775 width=16) (actual time=0.008..2.374 rows=73775.00 loops=1)
+                                                                            Buffers: shared hit=470
+                                                                      ->  Hash  (cost=518.74..518.74 rows=29874 width=16) (actual time=3.344..3.344 rows=29874.00 loops=1)
+                                                                            Buckets: 32768  Batches: 1  Memory Usage: 1657kB
+                                                                            Buffers: shared hit=220
+                                                                            ->  Seq Scan on refusal_doc rd  (cost=0.00..518.74 rows=29874 width=16) (actual time=0.003..1.460 rows=29874.00 loops=1)
+                                                                                  Buffers: shared hit=220
+                                                                ->  Hash  (cost=1.04..1.04 rows=4 width=21) (actual time=0.465..0.466 rows=4.00 loops=1)
+                                                                      Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                                                      Buffers: shared hit=1
+                                                                      ->  Seq Scan on refusal_reason rr_1  (cost=0.00..1.04 rows=4 width=21) (actual time=0.457..0.458 rows=4.00 loops=1)
+                                                                            Buffers: shared hit=1
+                            ->  Hash  (cost=686.28..686.28 rows=1258 width=62) (actual time=6.511..6.513 rows=5000.00 loops=1)
+                                  Buckets: 8192 (originally 2048)  Batches: 1 (originally 1)  Memory Usage: 546kB
+                                  Buffers: shared hit=248
+                                  ->  Hash Right Join  (cost=555.03..686.28 rows=1258 width=62) (actual time=4.343..5.749 rows=5000.00 loops=1)
+                                        Hash Cond: (t_2.owner_user_id = u.user_id)
+                                        Buffers: shared hit=248
+                                        ->  HashAggregate  (cost=311.71..361.71 rows=5000 width=17) (actual time=2.699..3.104 rows=5000.00 loops=1)
+                                              Group Key: t_2.owner_user_id
+                                              Batches: 1  Memory Usage: 665kB
+                                              Buffers: shared hit=98
+                                              ->  Seq Scan on ticket t_2  (cost=0.00..192.98 rows=9498 width=13) (actual time=0.004..0.344 rows=9498.00 loops=1)
+                                                    Buffers: shared hit=98
+                                        ->  Hash  (cost=227.60..227.60 rows=1258 width=53) (actual time=1.638..1.638 rows=5000.00 loops=1)
+                                              Buckets: 8192 (originally 2048)  Batches: 1 (originally 1)  Memory Usage: 502kB
+                                              Buffers: shared hit=150
+                                              ->  Hash Join  (cost=1.06..227.60 rows=1258 width=53) (actual time=0.034..1.147 rows=5000.00 loops=1)
+                                                    Hash Cond: (u.role_id = r.role_id)
+                                                    Buffers: shared hit=150
+                                                    ->  Seq Scan on library_user u  (cost=0.00..199.33 rows=5033 width=57) (actual time=0.009..0.198 rows=5033.00 loops=1)
+                                                          Buffers: shared hit=149
+                                                    ->  Hash  (cost=1.05..1.05 rows=1 width=4) (actual time=0.009..0.009 rows=1.00 loops=1)
+                                                          Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                                          Buffers: shared hit=1
+                                                          ->  Seq Scan on role r  (cost=0.00..1.05 rows=1 width=4) (actual time=0.006..0.007 rows=1.00 loops=1)
+                                                                Filter: (role_code = 4)
+                                                                Rows Removed by Filter: 3
+                                                                Buffers: shared hit=1
+          ->  Hash  (cost=442.44..442.44 rows=11 width=23) (actual time=2.773..2.775 rows=4589.00 loops=1)
+                Buckets: 8192 (originally 1024)  Batches: 1 (originally 1)  Memory Usage: 315kB
+                Buffers: shared hit=98
+                ->  Subquery Scan on ranked  (cost=364.43..442.44 rows=11 width=23) (actual time=1.302..2.435 rows=4589.00 loops=1)
+                      Filter: (ranked.rn = 1)
+                      Buffers: shared hit=98
+                      ->  WindowAgg  (cost=364.43..414.58 rows=2229 width=43) (actual time=1.301..2.188 rows=4589.00 loops=1)
+"                            Window: w1 AS (PARTITION BY t_3.owner_user_id ORDER BY t_3.issue_date, t_3.ticket_id ROWS UNBOUNDED PRECEDING)"
+                            Run Condition: (row_number() OVER w1 <= 1)
+                            Storage: Memory  Maximum Storage: 17kB
+                            Buffers: shared hit=98
+                            ->  Sort  (cost=364.43..370.00 rows=2229 width=35) (actual time=1.294..1.388 rows=4589.00 loops=1)
+"                                  Sort Key: t_3.owner_user_id, t_3.issue_date DESC, t_3.ticket_id DESC"
+                                  Sort Method: quicksort  Memory: 443kB
+                                  Buffers: shared hit=98
+                                  ->  Seq Scan on ticket t_3  (cost=0.00..240.47 rows=2229 width=35) (actual time=0.016..0.873 rows=4589.00 loops=1)
+                                        Filter: (is_active AND (expire_date >= CURRENT_DATE))
+                                        Rows Removed by Filter: 4909
+                                        Buffers: shared hit=98
+  InitPlan 2
+    ->  Aggregate  (cost=28.30..28.32 rows=1 width=8) (actual time=3.883..3.883 rows=1.00 loops=1)
+          ->  CTE Scan on reader_report  (cost=0.00..25.16 rows=1258 width=8) (actual time=0.000..3.645 rows=5000.00 loops=1)
+                Storage: Memory  Maximum Storage: 697kB
+  ->  CTE Scan on reader_report rr  (cost=0.00..31.45 rows=2 width=127) (actual time=82.883..82.972 rows=1.00 loops=1)
+        Filter: ((total_overdue_days > 0) AND (total_overdue_days = (InitPlan 2).col1))
+        Rows Removed by Filter: 4999
+        Storage: Memory  Maximum Storage: 697kB
+        Buffers: shared hit=1908
+Planning:
+  Buffers: shared hit=276
+Planning Time: 7.490 ms
+Execution Time: 84.152 ms

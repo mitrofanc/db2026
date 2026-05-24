@@ -11,18 +11,37 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 
 RANDOM_SEED = int(os.getenv("RANDOM_SEED", "42"))
-READERS_COUNT = int(os.getenv("READERS_COUNT", "60"))
-OPERATORS_COUNT = int(os.getenv("OPERATORS_COUNT", "4"))
-BIBLIOGRAPHERS_COUNT = int(os.getenv("BIBLIOGRAPHERS_COUNT", "3"))
-PUBLISHERS_COUNT = int(os.getenv("PUBLISHERS_COUNT", "18"))
-AUTHORS_COUNT = int(os.getenv("AUTHORS_COUNT", "40"))
-EDITIONS_COUNT = int(os.getenv("EDITIONS_COUNT", "90"))
-REQUESTS_COUNT = int(os.getenv("REQUESTS_COUNT", "120"))
+READERS_COUNT = int(os.getenv("READERS_COUNT", "5000"))
+OPERATORS_COUNT = int(os.getenv("OPERATORS_COUNT", "18"))
+BIBLIOGRAPHERS_COUNT = int(os.getenv("BIBLIOGRAPHERS_COUNT", "12"))
+PUBLISHERS_COUNT = int(os.getenv("PUBLISHERS_COUNT", "240"))
+AUTHORS_COUNT = int(os.getenv("AUTHORS_COUNT", "1600"))
+EDITIONS_COUNT = int(os.getenv("EDITIONS_COUNT", "6000"))
+REQUESTS_COUNT = int(os.getenv("REQUESTS_COUNT", "35000"))
+INACTIVE_TICKET_RATE = float(os.getenv("INACTIVE_TICKET_RATE", "0.08"))
+REISSUE_READER_FRACTION = float(os.getenv("REISSUE_READER_FRACTION", "0.45"))
+MAX_ARCHIVED_TICKETS_PER_READER = int(os.getenv("MAX_ARCHIVED_TICKETS_PER_READER", "3"))
+
+
+def env_date(name, default_value):
+    raw = os.getenv(name)
+    if not raw:
+        return default_value
+
+    try:
+        return date.fromisoformat(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"{name} must be in YYYY-MM-DD format, got {raw!r}"
+        ) from exc
 
 random.seed(RANDOM_SEED)
-DATA_YEAR = 2024
+SYSTEM_TODAY = date.today()
+DATA_YEAR = int(os.getenv("DATA_YEAR", str(SYSTEM_TODAY.year)))
 YEAR_START = date(DATA_YEAR, 1, 1)
-TODAY = date(DATA_YEAR, 12, 31)
+YEAR_END = date(DATA_YEAR, 12, 31)
+DEFAULT_DATA_END = SYSTEM_TODAY if SYSTEM_TODAY.year == DATA_YEAR else YEAR_END
+TODAY = min(max(env_date("DATA_END_DATE", DEFAULT_DATA_END), YEAR_START), YEAR_END)
 
 LAST_NAMES = [
     "Иванов", "Петров", "Сидоров", "Смирнов", "Кузнецов", "Попов", "Соколов", "Лебедев",
@@ -259,6 +278,7 @@ for i in range(BIBLIOGRAPHERS_COUNT):
 # читатели и билеты
 reader_ids = []
 ticket_ids = []
+next_ticket_serial = 0
 
 for i in range(READERS_COUNT):
     ln, fn, mn = random_person()
@@ -291,7 +311,7 @@ for i in range(READERS_COUNT):
     expire_date = issue_date + timedelta(days=365 * 5)
 
     # часть билетов делаем просроченными
-    if random.random() < 0.12 and issue_date < TODAY:
+    if random.random() < INACTIVE_TICKET_RATE and issue_date < TODAY:
         expire_date = random_date_between(issue_date, TODAY - timedelta(days=1))
         is_active = False
     else:
@@ -307,7 +327,7 @@ for i in range(READERS_COUNT):
         RETURNING ticket_id
         """,
         (
-            f"TKT{i:07d}",
+            f"TKT{next_ticket_serial:07d}",
             reader_id,
             random.choice(operator_ids),
             issue_date,
@@ -315,29 +335,34 @@ for i in range(READERS_COUNT):
             is_active,
         ),
     )
+    next_ticket_serial += 1
     ticket_ids.append(cur.fetchone()[0])
 
-    # часть читателей получает архивный билет, чтобы запрос 04 находил пользователей с перевыпуском
-    if i < max(1, READERS_COUNT // 5):
-        archived_issue_date = random_date_between(YEAR_START, TODAY - timedelta(days=1))
-        archived_expire_date = random_date_between(archived_issue_date, TODAY - timedelta(days=1))
-        cur.execute(
-            """
-            INSERT INTO ticket (
-                ticket_number, owner_user_id, operator_user_id,
-                issue_date, expire_date, is_active
+    # у части читателей генерируем историю перевыпусков,
+    # чтобы было что оптимизировать в выборке "текущего" билета.
+    if random.random() < REISSUE_READER_FRACTION:
+        archived_ticket_count = random.randint(1, MAX_ARCHIVED_TICKETS_PER_READER)
+        for _ in range(archived_ticket_count):
+            archived_issue_date = random_date_between(YEAR_START, TODAY - timedelta(days=1))
+            archived_expire_date = random_date_between(archived_issue_date, TODAY - timedelta(days=1))
+            cur.execute(
+                """
+                INSERT INTO ticket (
+                    ticket_number, owner_user_id, operator_user_id,
+                    issue_date, expire_date, is_active
+                )
+                VALUES (%s,%s,%s,%s,%s,%s)
+                """,
+                (
+                    f"TKT{next_ticket_serial:07d}",
+                    reader_id,
+                    random.choice(operator_ids),
+                    archived_issue_date,
+                    archived_expire_date,
+                    False,
+                ),
             )
-            VALUES (%s,%s,%s,%s,%s,%s)
-            """,
-            (
-                f"TKT{READERS_COUNT + i:07d}",
-                reader_id,
-                random.choice(operator_ids),
-                archived_issue_date,
-                archived_expire_date,
-                False,
-            ),
-        )
+            next_ticket_serial += 1
 
 # издательства
 publisher_ids = []
@@ -445,6 +470,10 @@ for _ in range(max(10, READERS_COUNT // 3)):
     for edition_id in selected_editions:
         due_date = issue_date + timedelta(days=30)
         scenario = random.random()
+        copies_available = available_count(cur, edition_id)
+
+        if scenario >= 0.35 and copies_available <= 0:
+            scenario = 0.0
 
         # возвращена вовремя/с опозданием
         if scenario < 0.35:

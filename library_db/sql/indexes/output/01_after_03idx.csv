@@ -1,0 +1,176 @@
+Limit  (cost=25517.42..25517.45 rows=10 width=193) (actual time=98.356..98.365 rows=10.00 loops=1)
+  Buffers: shared hit=3705
+  ->  Sort  (cost=25517.42..25540.48 rows=9225 width=193) (actual time=98.355..98.363 rows=10.00 loops=1)
+"        Sort Key: (COALESCE(eis.total_issue_count, '0'::bigint)) DESC, e.title, e.edition_id"
+        Sort Method: top-N heapsort  Memory: 34kB
+        Buffers: shared hit=3705
+        ->  Hash Left Join  (cost=22462.06..25318.07 rows=9225 width=193) (actual time=94.077..96.957 rows=6000.00 loops=1)
+              Hash Cond: (e.edition_id = ranked_1.edition_id)
+              Buffers: shared hit=3705
+              ->  Hash Right Join  (cost=19738.72..22431.99 rows=9225 width=182) (actual time=81.824..83.261 rows=6000.00 loops=1)
+                    Hash Cond: (ranked.publisher_id = e.publisher_id)
+                    Buffers: shared hit=3415
+                    ->  Subquery Scan on ranked  (cost=12155.09..14737.19 rows=369 width=40) (actual time=27.892..28.039 rows=240.00 loops=1)
+                          Filter: (ranked.rn = 1)
+                          Buffers: shared hit=1162
+                          ->  WindowAgg  (cost=12155.09..13815.00 rows=73775 width=56) (actual time=27.891..28.026 rows=240.00 loops=1)
+"                                Window: w1 AS (PARTITION BY e_1.publisher_id ORDER BY (count(*)), (COALESCE(rr.reason_name, ri.reason_text, 'Не указана'::character varying)) ROWS UNBOUNDED PRECEDING)"
+                                Run Condition: (row_number() OVER w1 <= 1)
+                                Storage: Memory  Maximum Storage: 17kB
+                                Buffers: shared hit=1162
+                                ->  Sort  (cost=12155.06..12339.50 rows=73775 width=48) (actual time=27.886..27.915 rows=680.00 loops=1)
+"                                      Sort Key: e_1.publisher_id, (count(*)) DESC, (COALESCE(rr.reason_name, ri.reason_text, 'Не указана'::character varying))"
+                                      Sort Method: quicksort  Memory: 89kB
+                                      Buffers: shared hit=1162
+                                      ->  HashAggregate  (cost=3180.79..3918.54 rows=73775 width=48) (actual time=27.571..27.783 rows=680.00 loops=1)
+"                                            Group Key: e_1.publisher_id, COALESCE(rr.reason_name, ri.reason_text, 'Не указана'::character varying)"
+                                            Batches: 1  Memory Usage: 1177kB
+                                            Buffers: shared hit=1162
+                                            ->  Hash Left Join  (cost=827.09..2627.48 rows=73775 width=40) (actual time=1.011..18.809 rows=73775.00 loops=1)
+                                                  Hash Cond: (ri.reason_id = rr.reason_id)
+                                                  Buffers: shared hit=1162
+                                                  ->  Hash Join  (cost=826.00..2227.54 rows=73775 width=532) (actual time=0.995..11.090 rows=73775.00 loops=1)
+                                                        Hash Cond: (ri.edition_id = e_1.edition_id)
+                                                        Buffers: shared hit=1161
+                                                        ->  Seq Scan on refusal_item ri  (cost=0.00..1207.75 rows=73775 width=532) (actual time=0.014..2.030 rows=73775.00 loops=1)
+                                                              Buffers: shared hit=470
+                                                        ->  Hash  (cost=751.00..751.00 rows=6000 width=16) (actual time=0.978..0.978 rows=6000.00 loops=1)
+                                                              Buckets: 8192  Batches: 1  Memory Usage: 346kB
+                                                              Buffers: shared hit=691
+                                                              ->  Seq Scan on edition e_1  (cost=0.00..751.00 rows=6000 width=16) (actual time=0.021..0.666 rows=6000.00 loops=1)
+                                                                    Buffers: shared hit=691
+                                                  ->  Hash  (cost=1.04..1.04 rows=4 width=64) (actual time=0.009..0.009 rows=4.00 loops=1)
+                                                        Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                                        Buffers: shared hit=1
+                                                        ->  Seq Scan on refusal_reason rr  (cost=0.00..1.04 rows=4 width=64) (actual time=0.008..0.008 rows=4.00 loops=1)
+                                                              Buffers: shared hit=1
+                    ->  Hash  (cost=7508.63..7508.63 rows=6000 width=158) (actual time=53.927..53.932 rows=6000.00 loops=1)
+                          Buckets: 8192  Batches: 1  Memory Usage: 1570kB
+                          Buffers: shared hit=2253
+                          ->  Hash Left Join  (cost=6687.66..7508.63 rows=6000 width=158) (actual time=48.941..52.975 rows=6000.00 loops=1)
+                                Hash Cond: (e.publisher_id = prs.publisher_id)
+                                Buffers: shared hit=2253
+                                ->  Hash Left Join  (cost=4083.44..4888.39 rows=6000 width=150) (actual time=33.216..36.669 rows=6000.00 loops=1)
+                                      Hash Cond: (e.edition_id = eis.edition_id)
+                                      Buffers: shared hit=1092
+                                      ->  Hash Left Join  (cost=1431.41..2220.59 rows=6000 width=126) (actual time=18.970..21.607 rows=6000.00 loops=1)
+                                            Hash Cond: (e.rubric_id = r.rubric_id)
+                                            Buffers: shared hit=802
+                                            ->  Hash Left Join  (cost=1430.18..2196.94 rows=6000 width=103) (actual time=18.951..20.912 rows=6000.00 loops=1)
+                                                  Hash Cond: (e.edition_id = ea.edition_id)
+                                                  Buffers: shared hit=801
+                                                  ->  Seq Scan on edition e  (cost=0.00..751.00 rows=6000 width=71) (actual time=0.066..0.435 rows=6000.00 loops=1)
+                                                        Buffers: shared hit=691
+                                                  ->  Hash  (cost=1355.18..1355.18 rows=6000 width=40) (actual time=18.878..18.879 rows=6000.00 loops=1)
+                                                        Buckets: 8192  Batches: 1  Memory Usage: 864kB
+                                                        Buffers: shared hit=110
+                                                        ->  Subquery Scan on ea  (cost=1101.25..1355.18 rows=6000 width=40) (actual time=8.785..17.689 rows=6000.00 loops=1)
+                                                              Buffers: shared hit=110
+                                                              ->  GroupAggregate  (cost=1101.25..1295.18 rows=6000 width=40) (actual time=8.784..17.084 rows=6000.00 loops=1)
+                                                                    Group Key: ea_1.edition_id
+                                                                    Buffers: shared hit=110
+                                                                    ->  Sort  (cost=1101.25..1130.99 rows=11893 width=65) (actual time=8.767..9.454 rows=11893.00 loops=1)
+"                                                                          Sort Key: ea_1.edition_id, ea_1.author_order, a.author_id"
+                                                                          Sort Method: quicksort  Memory: 1382kB
+                                                                          Buffers: shared hit=110
+                                                                          ->  Hash Join  (cost=70.00..296.23 rows=11893 width=65) (actual time=0.899..5.545 rows=11893.00 loops=1)
+                                                                                Hash Cond: (ea_1.author_id = a.author_id)
+                                                                                Buffers: shared hit=110
+                                                                                ->  Seq Scan on edition_author ea_1  (cost=0.00..194.93 rows=11893 width=20) (actual time=0.007..0.947 rows=11893.00 loops=1)
+                                                                                      Buffers: shared hit=76
+                                                                                ->  Hash  (cost=50.00..50.00 rows=1600 width=53) (actual time=0.883..0.884 rows=1600.00 loops=1)
+                                                                                      Buckets: 2048  Batches: 1  Memory Usage: 157kB
+                                                                                      Buffers: shared hit=34
+                                                                                      ->  Seq Scan on author a  (cost=0.00..50.00 rows=1600 width=53) (actual time=0.009..0.327 rows=1600.00 loops=1)
+                                                                                            Buffers: shared hit=34
+                                            ->  Hash  (cost=1.10..1.10 rows=10 width=39) (actual time=0.015..0.015 rows=10.00 loops=1)
+                                                  Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                                  Buffers: shared hit=1
+                                                  ->  Seq Scan on rubric r  (cost=0.00..1.10 rows=10 width=39) (actual time=0.013..0.014 rows=10.00 loops=1)
+                                                        Buffers: shared hit=1
+                                      ->  Hash  (cost=2580.86..2580.86 rows=5694 width=32) (actual time=14.242..14.244 rows=5694.00 loops=1)
+                                            Buckets: 8192  Batches: 1  Memory Usage: 420kB
+                                            Buffers: shared hit=290
+                                            ->  Subquery Scan on eis  (cost=2126.58..2580.86 rows=5694 width=32) (actual time=9.626..13.664 rows=5694.00 loops=1)
+                                                  Buffers: shared hit=290
+                                                  ->  GroupAggregate  (cost=2126.58..2523.92 rows=5694 width=32) (actual time=9.625..13.391 rows=5694.00 loops=1)
+                                                        Group Key: ii.edition_id
+                                                        Buffers: shared hit=290
+                                                        ->  Sort  (cost=2126.58..2169.13 rows=17020 width=24) (actual time=9.615..10.104 rows=17020.00 loops=1)
+"                                                              Sort Key: ii.edition_id, t.owner_user_id"
+                                                              Sort Method: quicksort  Memory: 1469kB
+                                                              Buffers: shared hit=290
+                                                              ->  Hash Join  (cost=554.90..930.50 rows=17020 width=24) (actual time=2.286..6.651 rows=17020.00 loops=1)
+                                                                    Hash Cond: (id.ticket_id = t.ticket_id)
+                                                                    Buffers: shared hit=290
+                                                                    ->  Hash Join  (cost=243.20..574.10 rows=17020 width=24) (actual time=0.873..3.384 rows=17020.00 loops=1)
+                                                                          Hash Cond: (ii.issue_doc_id = id.issue_doc_id)
+                                                                          Buffers: shared hit=192
+                                                                          ->  Seq Scan on issue_item ii  (cost=0.00..286.20 rows=17020 width=20) (actual time=0.013..0.470 rows=17020.00 loops=1)
+                                                                                Buffers: shared hit=116
+                                                                          ->  Hash  (cost=150.31..150.31 rows=7431 width=20) (actual time=0.853..0.854 rows=7431.00 loops=1)
+                                                                                Buckets: 8192  Batches: 1  Memory Usage: 471kB
+                                                                                Buffers: shared hit=76
+                                                                                ->  Seq Scan on issue_doc id  (cost=0.00..150.31 rows=7431 width=20) (actual time=0.006..0.428 rows=7431.00 loops=1)
+                                                                                      Buffers: shared hit=76
+                                                                    ->  Hash  (cost=192.98..192.98 rows=9498 width=16) (actual time=1.397..1.398 rows=9498.00 loops=1)
+                                                                          Buckets: 16384  Batches: 1  Memory Usage: 574kB
+                                                                          Buffers: shared hit=98
+                                                                          ->  Seq Scan on ticket t  (cost=0.00..192.98 rows=9498 width=16) (actual time=0.004..0.741 rows=9498.00 loops=1)
+                                                                                Buffers: shared hit=98
+                                ->  Hash  (cost=2601.22..2601.22 rows=240 width=16) (actual time=15.719..15.720 rows=240.00 loops=1)
+                                      Buckets: 1024  Batches: 1  Memory Usage: 20kB
+                                      Buffers: shared hit=1161
+                                      ->  Subquery Scan on prs  (cost=2596.42..2601.22 rows=240 width=16) (actual time=15.680..15.703 rows=240.00 loops=1)
+                                            Buffers: shared hit=1161
+                                            ->  HashAggregate  (cost=2596.42..2598.82 rows=240 width=16) (actual time=15.680..15.692 rows=240.00 loops=1)
+                                                  Group Key: e_2.publisher_id
+                                                  Batches: 1  Memory Usage: 56kB
+                                                  Buffers: shared hit=1161
+                                                  ->  Hash Join  (cost=826.00..2227.54 rows=73775 width=8) (actual time=1.162..10.199 rows=73775.00 loops=1)
+                                                        Hash Cond: (ri_1.edition_id = e_2.edition_id)
+                                                        Buffers: shared hit=1161
+                                                        ->  Seq Scan on refusal_item ri_1  (cost=0.00..1207.75 rows=73775 width=8) (actual time=0.019..2.076 rows=73775.00 loops=1)
+                                                              Buffers: shared hit=470
+                                                        ->  Hash  (cost=751.00..751.00 rows=6000 width=16) (actual time=1.140..1.140 rows=6000.00 loops=1)
+                                                              Buckets: 8192  Batches: 1  Memory Usage: 346kB
+                                                              Buffers: shared hit=691
+                                                              ->  Seq Scan on edition e_2  (cost=0.00..751.00 rows=6000 width=16) (actual time=0.024..0.836 rows=6000.00 loops=1)
+                                                                    Buffers: shared hit=691
+              ->  Hash  (cost=2722.28..2722.28 rows=85 width=19) (actual time=12.248..12.249 rows=5694.00 loops=1)
+                    Buckets: 8192 (originally 1024)  Batches: 1 (originally 1)  Memory Usage: 376kB
+                    Buffers: shared hit=290
+                    ->  Subquery Scan on ranked_1  (cost=2126.60..2722.28 rows=85 width=19) (actual time=9.161..11.845 rows=5694.00 loops=1)
+                          Filter: (ranked_1.rn = 1)
+                          Buffers: shared hit=290
+                          ->  WindowAgg  (cost=2126.60..2509.53 rows=17020 width=39) (actual time=9.160..11.525 rows=5694.00 loops=1)
+"                                Window: w1 AS (PARTITION BY ii_1.edition_id ORDER BY id_1.issue_date, id_1.issue_doc_id ROWS UNBOUNDED PRECEDING)"
+                                Run Condition: (row_number() OVER w1 <= 1)
+                                Storage: Memory  Maximum Storage: 17kB
+                                Buffers: shared hit=290
+                                ->  Sort  (cost=2126.58..2169.13 rows=17020 width=31) (actual time=9.151..9.584 rows=17020.00 loops=1)
+"                                      Sort Key: ii_1.edition_id, id_1.issue_date DESC, id_1.issue_doc_id DESC"
+                                      Sort Method: quicksort  Memory: 1699kB
+                                      Buffers: shared hit=290
+                                      ->  Hash Join  (cost=554.90..930.50 rows=17020 width=31) (actual time=2.091..6.495 rows=17020.00 loops=1)
+                                            Hash Cond: (id_1.ticket_id = t_1.ticket_id)
+                                            Buffers: shared hit=290
+                                            ->  Hash Join  (cost=243.20..574.10 rows=17020 width=28) (actual time=1.000..3.332 rows=17020.00 loops=1)
+                                                  Hash Cond: (ii_1.issue_doc_id = id_1.issue_doc_id)
+                                                  Buffers: shared hit=192
+                                                  ->  Seq Scan on issue_item ii_1  (cost=0.00..286.20 rows=17020 width=16) (actual time=0.005..0.441 rows=17020.00 loops=1)
+                                                        Buffers: shared hit=116
+                                                  ->  Hash  (cost=150.31..150.31 rows=7431 width=20) (actual time=0.973..0.973 rows=7431.00 loops=1)
+                                                        Buckets: 8192  Batches: 1  Memory Usage: 471kB
+                                                        Buffers: shared hit=76
+                                                        ->  Seq Scan on issue_doc id_1  (cost=0.00..150.31 rows=7431 width=20) (actual time=0.004..0.502 rows=7431.00 loops=1)
+                                                              Buffers: shared hit=76
+                                            ->  Hash  (cost=192.98..192.98 rows=9498 width=19) (actual time=1.087..1.087 rows=9498.00 loops=1)
+                                                  Buckets: 16384  Batches: 1  Memory Usage: 648kB
+                                                  Buffers: shared hit=98
+                                                  ->  Seq Scan on ticket t_1  (cost=0.00..192.98 rows=9498 width=19) (actual time=0.011..0.491 rows=9498.00 loops=1)
+                                                        Buffers: shared hit=98
+Planning:
+  Buffers: shared hit=89
+Planning Time: 13.741 ms
+Execution Time: 98.728 ms

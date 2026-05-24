@@ -53,23 +53,22 @@ request_stats AS (
     LEFT JOIN request_flags rf ON rf.request_id = br.request_id
     GROUP BY t.owner_user_id
 ),
--- сколько просроченный и текущая суммарная просрочка
+-- сколько просроченных
+overdue_issue_items AS (
+    SELECT id.ticket_id,
+           ii.due_date
+    FROM issue_doc id
+    JOIN issue_item ii ON ii.issue_doc_id = id.issue_doc_id
+    WHERE ii.return_date IS NULL
+      AND ii.due_date < CURRENT_DATE
+),
+-- текущая суммарная просрочка
 overdue_stats AS (
     SELECT t.owner_user_id AS reader_id,
-           COUNT(*) FILTER (
-               WHERE ii.return_date IS NULL
-                 AND ii.due_date < CURRENT_DATE
-           ) AS current_overdue_book_count,
-           COALESCE(
-               SUM((CURRENT_DATE - ii.due_date)) FILTER (
-                   WHERE ii.return_date IS NULL
-                     AND ii.due_date < CURRENT_DATE
-               ),
-               0
-           ) AS total_overdue_days
+           COUNT(oi.ticket_id) AS current_overdue_book_count,
+           COALESCE(SUM(CURRENT_DATE - oi.due_date), 0) AS total_overdue_days
     FROM ticket t
-    LEFT JOIN issue_doc id ON id.ticket_id = t.ticket_id
-    LEFT JOIN issue_item ii ON ii.issue_doc_id = id.issue_doc_id
+    LEFT JOIN overdue_issue_items oi ON oi.ticket_id = t.ticket_id
     GROUP BY t.owner_user_id
 ),
 reader_report AS (
